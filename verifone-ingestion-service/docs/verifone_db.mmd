@@ -1,0 +1,640 @@
+erDiagram
+
+
+%% ======================= ingest relationships =======================
+    MASTER_STORES ||--o{ INGEST_FETCH_REQUESTS : "fetch clicks"
+    MASTER_STORES ||--o{ INGEST_S3_OBJECTS : "zips"
+    INGEST_S3_OBJECTS ||--|{ INGEST_S3_OBJECT_FILES : "files in manifest"
+    INGEST_S3_OBJECTS ||--o{ INGEST_FETCH_REQUESTS : "used by"
+
+%% ======================= cpj: the day =======================
+    INGEST_FETCH_REQUESTS ||--o{ CPJ_CPJ_FILES : "loaded by"
+    INGEST_S3_OBJECT_FILES ||--o| CPJ_CPJ_FILES : "loaded as"
+    MASTER_STORES ||--o{ CPJ_CPJ_FILES : ""
+    CPJ_CPJ_FILES ||--|{ CPJ_FILE_TOTALS : "START / END"
+    CPJ_CPJ_FILES ||--|{ CPJ_LOAD_CHECKS : "verification"
+    CPJ_CPJ_FILES ||--o{ CPJ_CASHIER_SESSIONS : ""
+    CPJ_CPJ_FILES ||--o{ CPJ_PERIOD_CLOSES : ""
+    CPJ_CPJ_FILES ||--o{ CPJ_TICKETS : ""
+    CPJ_CPJ_FILES ||--o{ CPJ_CASHIER_EVENTS : ""
+
+%% ======================= cpj: tickets =======================
+    CPJ_TICKETS ||--|{ CPJ_TICKET_CASHIERS : "CASHIER / ORIGINAL"
+    CPJ_TICKETS ||--o| CPJ_TICKET_AGE_CHECKS : "birth date"
+    CPJ_TICKETS ||--o| CPJ_TICKET_FOOD_STAMPS : ""
+    CPJ_TICKETS ||--o{ CPJ_TICKET_TAXES : ""
+    CPJ_TICKETS ||--o{ CPJ_TICKET_COUPONS : ""
+    CPJ_TICKETS ||--o{ CPJ_TICKET_NETWORK_PRODUCTS : ""
+    CPJ_TICKETS ||--o{ CPJ_TICKET_LOYALTY : ""
+    CPJ_TICKETS ||--o{ CPJ_PAYMENT_LINES : ""
+    CPJ_PAYMENT_LINES ||--o| CPJ_PAYMENT_CARD_DETAILS : ""
+    CPJ_TICKETS ||--o| CPJ_FUEL_PRICE_CHANGES : ""
+    CPJ_FUEL_PRICE_CHANGES ||--|{ CPJ_FUEL_PRICE_CHANGE_LINES : ""
+
+%% ======================= cpj: lines =======================
+    CPJ_TICKETS ||--o{ CPJ_TICKET_LINES : "sale lines"
+    CPJ_CASHIER_EVENTS ||--o{ CPJ_TICKET_LINES : "lines of an event"
+    CPJ_TICKET_LINES ||--o{ CPJ_TICKET_LINES : "void cancels line"
+    CPJ_TICKET_LINES ||--o{ CPJ_LINE_FLAGS : ""
+    CPJ_LINE_FLAG_TYPES ||--o{ CPJ_LINE_FLAGS : ""
+    CPJ_TICKET_LINES ||--o| CPJ_LINE_FUEL : ""
+    CPJ_TICKET_LINES ||--o{ CPJ_LINE_FUEL_DISCOUNTS : "per program"
+    CPJ_TICKET_LINES ||--o{ CPJ_LINE_LOYALTY_DISCOUNTS : ""
+    CPJ_TICKET_LINES ||--o{ CPJ_LINE_PROMOTIONS : ""
+    CPJ_TICKET_LINES ||--o{ CPJ_LINE_TAXES : ""
+    CPJ_CASHIER_EVENTS ||--o{ CPJ_CASHIER_EVENT_DRAWER_TOTALS : ""
+    CPJ_CASHIER_EVENTS ||--o| CPJ_CASHIER_EVENT_PRICE_CHECKS : ""
+
+%% ======================= master codes (store-level) =======================
+    MASTER_STORES ||--o{ MASTER_DEPARTMENTS : ""
+    MASTER_DEPARTMENTS ||--|{ MASTER_DEPARTMENT_VERSIONS : "names"
+    MASTER_STORES ||--o{ MASTER_CATEGORIES : ""
+    MASTER_CATEGORIES ||--|{ MASTER_CATEGORY_VERSIONS : "names"
+    MASTER_STORES ||--o{ MASTER_ITEMS : ""
+    MASTER_ITEMS ||--|{ MASTER_ITEM_VERSIONS : "descriptions"
+    MASTER_STORES ||--o{ MASTER_CASHIERS : ""
+    MASTER_CASHIERS ||--|{ MASTER_CASHIER_VERSIONS : "names"
+    MASTER_STORES ||--o{ MASTER_REGISTERS : ""
+    MASTER_STORES ||--o{ MASTER_TAXES : ""
+    MASTER_TAXES ||--|{ MASTER_TAX_VERSIONS : "names"
+    MASTER_STORES ||--o{ MASTER_PAYMENT_TYPES : ""
+    MASTER_PAYMENT_TYPES ||--|{ MASTER_PAYMENT_TYPE_VERSIONS : "NACS codes"
+    MASTER_STORES ||--o{ MASTER_CARD_TYPES : ""
+    MASTER_STORES ||--o{ MASTER_CARDS : ""
+    MASTER_STORES ||--o{ MASTER_LOYALTY_PROGRAMS : ""
+    MASTER_LOYALTY_PROGRAMS ||--o{ MASTER_LOYALTY_ACCOUNTS : ""
+    MASTER_STORES ||--o{ MASTER_FUEL_GRADES : ""
+    MASTER_FUEL_GRADES ||--|{ MASTER_FUEL_GRADE_VERSIONS : "names"
+    MASTER_STORES ||--o{ MASTER_FUEL_PRICE_LEVELS : ""
+    MASTER_FUEL_PRICE_LEVELS ||--|{ MASTER_FUEL_PRICE_LEVEL_VERSIONS : "names"
+    MASTER_STORES ||--o{ MASTER_FUEL_SERVICE_MODES : ""
+    MASTER_FUEL_SERVICE_MODES ||--|{ MASTER_FUEL_SERVICE_MODE_VERSIONS : "names"
+    MASTER_STORES ||--o{ MASTER_FUEL_TIERS : ""
+    MASTER_STORES ||--o{ MASTER_PROMOTIONS : ""
+    MASTER_PROMOTIONS ||--|{ MASTER_PROMOTION_VERSIONS : "names"
+    MASTER_STORES ||--o{ MASTER_HOUSE_ACCOUNTS : ""
+    MASTER_HOUSE_ACCOUNTS ||--|{ MASTER_HOUSE_ACCOUNT_VERSIONS : "names"
+
+%% ======================= facts -> master =======================
+    MASTER_REGISTERS ||--o{ CPJ_TICKETS : "register / orig / recall"
+    MASTER_REGISTERS ||--o{ CPJ_CASHIER_SESSIONS : ""
+    MASTER_REGISTERS ||--o{ CPJ_CASHIER_EVENTS : ""
+    MASTER_REGISTERS ||--o{ CPJ_TICKET_CASHIERS : ""
+    MASTER_CASHIER_VERSIONS ||--o{ CPJ_TICKET_CASHIERS : ""
+    MASTER_CASHIER_VERSIONS ||--o{ CPJ_CASHIER_SESSIONS : ""
+    MASTER_CASHIER_VERSIONS ||--o{ CPJ_CASHIER_EVENTS : ""
+    MASTER_HOUSE_ACCOUNT_VERSIONS ||--o{ CPJ_TICKETS : ""
+    MASTER_DEPARTMENT_VERSIONS ||--o{ CPJ_TICKET_LINES : ""
+    MASTER_CATEGORY_VERSIONS ||--o{ CPJ_TICKET_LINES : ""
+    MASTER_ITEM_VERSIONS ||--o{ CPJ_TICKET_LINES : ""
+    MASTER_ITEM_VERSIONS ||--o{ CPJ_CASHIER_EVENT_PRICE_CHECKS : ""
+    MASTER_TAX_VERSIONS ||--o{ CPJ_TICKET_TAXES : ""
+    MASTER_TAX_VERSIONS ||--o{ CPJ_LINE_TAXES : ""
+    MASTER_PAYMENT_TYPE_VERSIONS ||--o{ CPJ_PAYMENT_LINES : ""
+    MASTER_CARDS ||--o{ CPJ_PAYMENT_CARD_DETAILS : ""
+    MASTER_CARD_TYPES ||--o{ CPJ_PAYMENT_CARD_DETAILS : ""
+    MASTER_LOYALTY_PROGRAMS ||--o{ CPJ_TICKET_LOYALTY : ""
+    MASTER_LOYALTY_ACCOUNTS ||--o{ CPJ_TICKET_LOYALTY : ""
+    MASTER_LOYALTY_PROGRAMS ||--o{ CPJ_LINE_FUEL_DISCOUNTS : ""
+    MASTER_LOYALTY_PROGRAMS ||--o{ CPJ_LINE_LOYALTY_DISCOUNTS : ""
+    MASTER_PROMOTION_VERSIONS ||--o{ CPJ_LINE_PROMOTIONS : ""
+    MASTER_FUEL_GRADE_VERSIONS ||--o{ CPJ_LINE_FUEL : ""
+    MASTER_FUEL_PRICE_LEVEL_VERSIONS ||--o{ CPJ_LINE_FUEL : ""
+    MASTER_FUEL_SERVICE_MODE_VERSIONS ||--o{ CPJ_LINE_FUEL : ""
+    MASTER_FUEL_GRADES ||--o{ CPJ_FUEL_PRICE_CHANGE_LINES : ""
+    MASTER_FUEL_SERVICE_MODES ||--o{ CPJ_FUEL_PRICE_CHANGE_LINES : ""
+    MASTER_FUEL_PRICE_LEVELS ||--o{ CPJ_FUEL_PRICE_CHANGE_LINES : ""
+    MASTER_FUEL_TIERS ||--o{ CPJ_FUEL_PRICE_CHANGE_LINES : ""
+
+%% ======================= columns: ingest =======================
+    INGEST_FETCH_REQUESTS {
+        bigint fetch_request_id PK
+        bigint store_id FK
+        text file_type "CPJ"
+        date business_date
+        text mode "REPLACE or REFUSE"
+        bigint requested_by "admin_id snapshot"
+        text requested_by_type "ADMIN or STORE_USER"
+        text requested_by_name "actor name snapshot"
+        timestamptz requested_at
+        text status "RUNNING LOADED REFUSED NOT_FOUND FAILED"
+        bigint s3_object_id FK "set when LOADED"
+        timestamptz finished_at "NULL while RUNNING"
+        text message "error or result summary"
+    }
+    INGEST_S3_OBJECTS {
+        bigint s3_object_id PK
+        bigint store_id FK
+        text file_type "CPJ"
+        date business_date
+        int version_no "_vN, highest wins"
+        text bucket UK
+        text object_key UK "matches _CPJ_date_vN.zip"
+        text etag UK
+        bigint size_bytes
+        timestamptz last_modified
+        timestamptz manifest_created_at
+        text mirror_version "fastMirrorVersion"
+        timestamptz downloaded_at
+    }
+    INGEST_S3_OBJECT_FILES {
+        bigint s3_object_id PK, FK
+        text file_path PK "e.g. CPJ/CPJ2026-10-11-617.xml"
+        bigint size_bytes
+        char64 sha256 "SHA-256 verified against manifest"
+        timestamptz modified_at
+    }
+
+%% ======================= columns: cpj =======================
+    CPJ_CPJ_FILES {
+        bigint cpj_file_id PK
+        bigint store_id FK, UK
+        date business_date UK
+        int day_seq UK "transSet shortId"
+        bigint s3_object_id FK "with store_id + business_date"
+        text file_path FK
+        bigint fetch_request_id FK
+        int period_id
+        text period_name "Day"
+        timestamptz period_long_id
+        text site_id "every storeNumber equals it"
+        timestamptz opened_at
+        timestamptz closed_at
+        timestamptz loaded_at
+    }
+    CPJ_FILE_TOTALS {
+        bigint cpj_file_id PK, FK
+        text totals_kind PK "START or END"
+        numeric inside_sales
+        numeric inside_grand
+        numeric outside_sales
+        numeric outside_grand
+        numeric attendant_inside_sales
+        numeric attendant_inside_grand
+        numeric attendant_outside_sales
+        numeric attendant_outside_grand
+        numeric overall_sales "POS counter check"
+        numeric overall_grand
+    }
+    CPJ_LOAD_CHECKS {
+        bigint cpj_file_id PK, FK
+        text check_name PK
+        numeric expected
+        numeric actual
+        boolean passed
+        text detail "starts hard: or soft:"
+    }
+    CPJ_CASHIER_SESSIONS {
+        bigint cashier_session_id PK
+        bigint cpj_file_id FK, UK
+        bigint register_id FK, UK
+        bigint cashier_version_id FK
+        int cashier_period UK
+        int drawer
+        timestamptz opened_at
+        numeric begin_cash
+        int begin_cash_mop_code
+        int begin_cash_mop_cat
+        timestamptz closed_at
+        numeric close_begin_cash
+        numeric close_begin_food_stamp
+        bigint begin_ticket
+        bigint end_ticket "may wrap below begin"
+        int ticket_count
+        boolean mws_enabled
+    }
+    CPJ_PERIOD_CLOSES {
+        bigint cpj_file_id PK, FK
+        int period_type PK "1 shift, 2 day"
+        int period_seq PK
+        text period_name
+        timestamptz closed_at
+        text unique_id
+        boolean mws_enabled
+    }
+    CPJ_TICKETS {
+        bigint ticket_id PK
+        bigint cpj_file_id FK, UK
+        int seq_in_file UK "journal trans counted"
+        text trans_type "sale, network sale, refund sale, ..."
+        boolean is_suspended
+        boolean is_fuel_prepay
+        boolean is_rollback
+        boolean is_prepay_completion
+        boolean is_recalled
+        bigint register_id FK
+        bigint tr_seq "ticket number"
+        text term_msg_type
+        int terminal_no
+        bigint term_msg_sn
+        text unique_id
+        bigint unique_sn
+        timestamptz ticket_at
+        int duration_sec
+        int hour_seq
+        int shift_seq
+        int day_seq
+        int till
+        bigint orig_register_id FK
+        bigint orig_tr_seq "completion to its prepay"
+        text recall_trans_type
+        bigint recall_register_id FK
+        bigint recall_tr_seq
+        text misc_ref "payout name or safe drop no"
+        bigint house_account_version_id FK
+        boolean is_fuel_only_customer
+        text currency
+        numeric total
+        numeric total_no_tax
+        numeric total_tax
+        numeric total_with_tax
+        numeric s_totalizer
+        numeric g_totalizer
+        numeric recall_amount
+    }
+    CPJ_TICKET_CASHIERS {
+        bigint ticket_id PK, FK
+        text cashier_role PK "CASHIER or ORIGINAL"
+        bigint cashier_version_id FK
+        bigint register_id FK
+        int cashier_period
+        int drawer
+    }
+    CPJ_TICKET_AGE_CHECKS {
+        bigint ticket_id PK, FK
+        date birth_date "PERSONAL - MMDDYY century from custAge"
+        smallint customer_age
+        smallint min_age
+        text entry_method
+    }
+    CPJ_TICKET_FOOD_STAMPS {
+        bigint ticket_id PK, FK
+        numeric total
+        numeric tax
+        numeric change_amount
+        numeric tendered
+    }
+    CPJ_TICKET_TAXES {
+        bigint ticket_id PK, FK
+        bigint tax_version_id PK, FK
+        boolean is_refund_tax PK
+        numeric taxable_amount
+        numeric tax_rate
+        numeric tax_amount
+        text tax_attribute
+        numeric exempt_amount
+        numeric exempt_against_amount
+    }
+    CPJ_TICKET_COUPONS {
+        bigint ticket_id PK, FK
+        smallint coupon_no PK
+        numeric discount_amount
+        boolean affects_tax
+        text entry_method
+        text coupon_data
+    }
+    CPJ_TICKET_NETWORK_PRODUCTS {
+        bigint ticket_id PK, FK
+        smallint entry_no PK
+        text product_code
+        int item_count
+        numeric amount
+    }
+    CPJ_TICKET_LOYALTY {
+        bigint ticket_id PK, FK
+        bigint loyalty_program_id PK, FK
+        bigint loyalty_account_id FK "NULL when empty"
+        text auth_reply
+        numeric auto_discount
+        numeric customer_discount
+        text entry_method
+        numeric subtotal
+    }
+    CPJ_PAYMENT_LINES {
+        bigint payment_line_id PK
+        bigint ticket_id FK, UK
+        smallint line_no UK
+        text payline_type "sale or cancel"
+        bigint payment_type_version_id FK
+        numeric amount "Change is negative"
+        text currency
+        int pos_sysid
+        boolean is_duplicate
+        boolean is_pending
+        numeric original_preauth_amount
+        text coupon_entry_method
+    }
+    CPJ_PAYMENT_CARD_DETAILS {
+        bigint payment_line_id PK, FK
+        bigint card_id FK "masked number"
+        bigint card_type_id FK
+        int card_name_sysid
+        text entry_method
+        text auth_code
+        timestamptz auth_at
+        text auth_source
+        text batch_no
+        text acquirer_batch_no
+        text host_id
+        text reference_no
+        text sequence_no
+        text host_ticket
+        boolean is_above_site
+    }
+    CPJ_FUEL_PRICE_CHANGES {
+        bigint ticket_id PK, FK
+        text changed_by "manager"
+        text change_origin
+    }
+    CPJ_FUEL_PRICE_CHANGE_LINES {
+        bigint ticket_id PK, FK
+        smallint entry_no PK
+        int info_sysid
+        bigint fuel_grade_id FK
+        bigint fuel_service_mode_id FK
+        bigint fuel_price_level_id FK
+        bigint fuel_tier_id FK
+        numeric previous_price
+        int previous_price_sysid
+        numeric current_price
+        int current_price_sysid
+    }
+    CPJ_CASHIER_EVENTS {
+        bigint cashier_event_id PK
+        bigint cpj_file_id FK, UK
+        int seq_in_file UK
+        text event_type "CHANGE_QTY ERROR_CORRECT LOGIN_LOGOUT SAFE_DROP PAY_OUT PRICE_CHECK"
+        timestamptz event_at
+        bigint register_id FK
+        bigint cashier_version_id FK
+        text cashier_entry_mode
+        bigint term_msg_sn
+        text unique_id
+        text event_text
+        text item_description
+        numeric from_quantity
+        numeric to_quantity
+        int duration_sec
+        int hour_seq
+        int shift_seq
+        int day_seq
+        text term_msg_type
+        int terminal_no
+        int cashier_period
+        int drawer
+    }
+    CPJ_CASHIER_EVENT_DRAWER_TOTALS {
+        bigint cashier_event_id PK, FK
+        text tender_name PK
+        numeric amount
+    }
+    CPJ_CASHIER_EVENT_PRICE_CHECKS {
+        bigint cashier_event_id PK, FK
+        bigint item_version_id FK
+        numeric quantity
+        numeric unit_price
+        numeric line_total
+    }
+    CPJ_TICKET_LINES {
+        bigint line_id PK
+        bigint ticket_id FK, UK "exactly one of ticket_id"
+        bigint cashier_event_id FK, UK "or cashier_event_id"
+        smallint line_no UK
+        text line_type "plu, dept, void plu, postFuel, ..."
+        boolean is_duplicate
+        boolean is_unsettled
+        bigint department_version_id FK
+        bigint category_version_id FK
+        bigint item_version_id FK
+        text upc_entry_method
+        text network_code
+        numeric quantity "positive"
+        smallint sign
+        numeric sell_unit
+        numeric unit_price
+        numeric line_total "signed, before mix-and-match"
+        numeric price_override
+        text discount_type
+        numeric discount_value
+        smallint voided_line_no FK "line_no in same ticket"
+        text pos_description "only when it differs"
+    }
+    CPJ_LINE_FLAG_TYPES {
+        text flag_code PK "trlPLU, trlFuelSale, trlNetVoid, ..."
+        text meaning
+    }
+    CPJ_LINE_FLAGS {
+        bigint line_id PK, FK
+        text flag_code PK, FK
+        text cause
+    }
+    CPJ_LINE_FUEL {
+        bigint line_id PK, FK
+        text fuel_type
+        bigint fuel_grade_version_id FK
+        bigint fuel_price_level_version_id FK
+        bigint fuel_service_mode_version_id FK
+        smallint fuel_position "pump number"
+        numeric volume
+        text volume_uom
+        numeric base_price
+        numeric deposit_amount
+        bigint fuel_seq
+    }
+    CPJ_LINE_FUEL_DISCOUNTS {
+        bigint line_id PK, FK
+        bigint loyalty_program_id PK, FK
+        numeric discount_per_gallon
+        numeric original_price
+        numeric total_discount
+        numeric volume
+    }
+    CPJ_LINE_LOYALTY_DISCOUNTS {
+        bigint line_id PK, FK
+        bigint loyalty_program_id PK, FK
+        numeric discount_amount
+        numeric quantity
+        numeric tax_credit
+    }
+    CPJ_LINE_PROMOTIONS {
+        bigint line_id PK, FK
+        smallint match_no PK
+        bigint promotion_version_id FK
+        int mixes
+        numeric match_quantity
+        numeric match_price
+        numeric promo_amount
+    }
+    CPJ_LINE_TAXES {
+        bigint line_id PK, FK
+        bigint tax_version_id PK, FK
+        numeric tax_amount
+        numeric tax_rate
+        boolean is_reverse
+    }
+
+%% ======================= columns: master =======================
+    MASTER_STORES {
+        bigint store_id PK "= auth_db core.stores.store_id"
+        text store_code UK "e.g. 8730_IN-47872"
+        text store_name "e.g. Tiki Hut"
+        text pos_vendor "VERIFONE"
+        text s3_folder "Tiki_8730_IN-47872/Tiki_8730_IN-47872/"
+        text timezone "e.g. America/Indiana/Indianapolis"
+        text status "ACTIVE or INACTIVE"
+        timestamptz synced_at "updated by /api/stores/sync/verifone"
+    }
+    MASTER_DEPARTMENTS {
+        bigint department_id PK
+        bigint store_id FK, UK
+        int dept_number UK
+        text lottery_class "LOTTERY_SALE or LOTTERY_PAYOUT, set in the app"
+        bigint lottery_class_set_by "admin_id snapshot"
+        text lottery_class_set_by_type "ADMIN or STORE_USER"
+        text lottery_class_set_by_name "name snapshot"
+        timestamptz lottery_class_set_at
+    }
+    MASTER_DEPARTMENT_VERSIONS {
+        bigint department_version_id PK
+        bigint department_id FK, UK
+        text name UK "e.g. Lotto"
+        text dept_type UK "e.g. fuel"
+    }
+    MASTER_CATEGORIES {
+        bigint category_id PK
+        bigint store_id FK, UK
+        int category_number UK
+    }
+    MASTER_CATEGORY_VERSIONS {
+        bigint category_version_id PK
+        bigint category_id FK, UK
+        text name UK
+    }
+    MASTER_ITEMS {
+        bigint item_id PK
+        bigint store_id FK, UK
+        text upc UK
+        text upc_modifier UK
+    }
+    MASTER_ITEM_VERSIONS {
+        bigint item_version_id PK
+        bigint item_id FK, UK
+        text description UK
+    }
+    MASTER_CASHIERS {
+        bigint cashier_id PK
+        bigint store_id FK, UK
+        int cashier_sysid UK
+    }
+    MASTER_CASHIER_VERSIONS {
+        bigint cashier_version_id PK
+        bigint cashier_id FK, UK
+        text name UK
+        int employee_number UK
+    }
+    MASTER_REGISTERS {
+        bigint register_id PK
+        bigint store_id FK, UK
+        int pos_num UK
+        int physical_register_id "never changes for a posNum"
+    }
+    MASTER_TAXES {
+        bigint tax_id PK
+        bigint store_id FK, UK
+        int tax_sysid UK
+    }
+    MASTER_TAX_VERSIONS {
+        bigint tax_version_id PK
+        bigint tax_id FK, UK
+        text name UK
+    }
+    MASTER_PAYMENT_TYPES {
+        bigint payment_type_id PK
+        bigint store_id FK, UK
+        int mop_code UK "mop; CASH and Change share 1"
+        text paycode UK "CASH, Change, DEBIT, CREDIT, COUPON, ..."
+    }
+    MASTER_PAYMENT_TYPE_VERSIONS {
+        bigint payment_type_version_id PK
+        bigint payment_type_id FK, UK
+        int mop_category UK
+        text nacs_tender_code UK
+        text nacs_tender_sub UK
+    }
+    MASTER_CARD_TYPES {
+        bigint card_type_id PK
+        bigint store_id FK, UK
+        text card_name UK
+    }
+    MASTER_CARDS {
+        bigint card_id PK
+        bigint store_id FK, UK
+        text masked_number UK "PERSONAL - masked only"
+    }
+    MASTER_LOYALTY_PROGRAMS {
+        bigint loyalty_program_id PK
+        bigint store_id FK, UK
+        text program_code UK
+    }
+    MASTER_LOYALTY_ACCOUNTS {
+        bigint loyalty_account_id PK
+        bigint loyalty_program_id FK, UK
+        text account_number UK "PERSONAL"
+    }
+    MASTER_FUEL_GRADES {
+        bigint fuel_grade_id PK
+        bigint store_id FK, UK
+        int grade_sysid UK
+    }
+    MASTER_FUEL_GRADE_VERSIONS {
+        bigint fuel_grade_version_id PK
+        bigint fuel_grade_id FK, UK
+        text name UK
+        text naxml_grade_id UK
+    }
+    MASTER_FUEL_PRICE_LEVELS {
+        bigint fuel_price_level_id PK
+        bigint store_id FK, UK
+        int level_sysid UK
+    }
+    MASTER_FUEL_PRICE_LEVEL_VERSIONS {
+        bigint fuel_price_level_version_id PK
+        bigint fuel_price_level_id FK, UK
+        text name UK
+    }
+    MASTER_FUEL_SERVICE_MODES {
+        bigint fuel_service_mode_id PK
+        bigint store_id FK, UK
+        int mode_sysid UK
+    }
+    MASTER_FUEL_SERVICE_MODE_VERSIONS {
+        bigint fuel_service_mode_version_id PK
+        bigint fuel_service_mode_id FK, UK
+        text name UK
+    }
+    MASTER_FUEL_TIERS {
+        bigint fuel_tier_id PK
+        bigint store_id FK, UK
+        int tier_sysid UK
+    }
+    MASTER_PROMOTIONS {
+        bigint promotion_id PK
+        bigint store_id FK, UK
+        text promotion_code UK
+    }
+    MASTER_PROMOTION_VERSIONS {
+        bigint promotion_version_id PK
+        bigint promotion_id FK, UK
+        text name UK
+        text promo_type UK "mixAndMatchOffer"
+    }
+    MASTER_HOUSE_ACCOUNTS {
+        bigint house_account_id PK
+        bigint store_id FK, UK
+        text account_number UK
+    }
+    MASTER_HOUSE_ACCOUNT_VERSIONS {
+        bigint house_account_version_id PK
+        bigint house_account_id FK, UK
+        text name UK
+    }

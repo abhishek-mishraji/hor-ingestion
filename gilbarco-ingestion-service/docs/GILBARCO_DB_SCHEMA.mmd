@@ -1,0 +1,288 @@
+%%{init: {"theme": "base", "themeVariables": {"background": "#f4fbf4", "primaryColor": "#d6f0da", "primaryTextColor": "#18301f", "primaryBorderColor": "#2e8b4e", "secondaryColor": "#e8f6ea", "tertiaryColor": "#f4fbf4", "lineColor": "#3f8f5a", "textColor": "#18301f", "attributeBackgroundColorOdd": "#f4fbf4", "attributeBackgroundColorEven": "#e6f5e8", "fontFamily": "Segoe UI, Arial, sans-serif"}}}%%
+erDiagram
+    %% =====================================================================================
+    %% gilbarco_db: entity-relationship diagram (PostgreSQL 17)
+    %% Source of truth: src/main/resources/db/migration V1..V6 (narrative: GILBARCO_DATABASE_DESIGN.md)
+    %% Mermaid entity names cannot contain dots, so <schema>.<table> is written <schema>_<table>:
+    %%   master_*  -> schema master  (store replica from auth_db, departments)
+    %%   ingest_*  -> schema ingest  (S3 zips, manifests, fetches, load checks)
+    %%   pjr_*     -> schema pjr     (Passport POS journal; pjr_pjr_file = pjr.pjr_file, pjr_event = pjr.event)
+    %%   mcm_*     -> schema mcm     (V6: store-level MCM department totals; names departments, proves PJR days)
+    %% Solid lines (--) are real foreign keys. Dotted lines (..) are logical joins with no FK.
+    %% Types: numeric columns are numeric(12,2) unless noted; quantities/prices are numeric(12,3).
+    %% Schema report holds views only (no tables), built on pjr.* + mcm.* + master.departments:
+    %%   v_sold_line, v_void_line, rpt_items_sold_daily, rpt_department_daily (V4), rpt_lottery_daily,
+    %%   rpt_lottery_payout_daily, rpt_fuel_daily, rpt_payment_daily, rpt_cash_movement,
+    %%   rpt_suspicious_event, rpt_suspicious_daily, rpt_void_daily, rpt_payment_gap, rpt_day_summary,
+    %%   rpt_mcm_department_check (V6: MCM vs PJR per department), rpt_mcm_day_check (V6: match | mismatch |
+    %%   mcm_missing | pjr_missing per store and day)
+    %% Function: master.sales_class_for(dept_name) -> merchandise | lottery_sale | lottery_payout
+    %% =====================================================================================
+
+    %% ---------------- master ----------------
+    master_stores ||--o{ master_departments          : "has departments"
+    master_stores ||--o{ master_department_changes   : "admin dept changes"
+    master_departments ||..o{ master_department_changes : "logical (store_id, dept_number)"
+
+    %% ---------------- ingest ----------------
+    master_stores ||--o{ ingest_s3_objects           : "downloaded zips"
+    master_stores ||--o{ ingest_fetch_requests       : "fetches"
+    ingest_s3_objects ||--o{ ingest_s3_object_files  : "manifest lists"
+    ingest_s3_objects |o--o{ ingest_fetch_requests   : "loaded zip (SET NULL)"
+    ingest_fetch_requests ||--o{ ingest_load_checks  : "checks (CASCADE)"
+
+    %% ---------------- pjr ----------------
+    master_stores ||--o{ pjr_pjr_file                : "files"
+    ingest_s3_objects |o--o{ pjr_pjr_file            : "unpacked from (CASCADE)"
+    pjr_pjr_file ||--|| pjr_event                    : "exactly one event (CASCADE)"
+    master_stores ||--o{ pjr_event                   : "events"
+    pjr_event ||--o{ pjr_event_line                  : "lines (CASCADE)"
+    pjr_event ||--o{ pjr_tender_line                 : "tenders (CASCADE)"
+    pjr_event ||--o{ pjr_event_tax                   : "taxes (CASCADE)"
+    master_stores ||--o{ pjr_event_line              : "lines"
+    master_departments |o..o{ pjr_event_line         : "logical (store_id, dept_number)"
+    master_stores |o--o{ pjr_load_failure            : "failures (CASCADE)"
+    ingest_fetch_requests |o--o{ pjr_load_failure    : "during fetch (SET NULL)"
+
+    %% ---------------- mcm (V6) ----------------
+    master_stores ||--o{ mcm_department_day          : "department totals"
+    ingest_s3_objects ||--o{ mcm_department_day      : "store-level file of (CASCADE)"
+    mcm_department_day }o..|| master_departments     : "names: upserts pos_name (store_id, dept_number)"
+    mcm_department_day |o..o{ pjr_event_line         : "proves: report.rpt_mcm_department_check"
+
+    %% =============== master ===============
+    master_stores {
+        bigint      store_id     PK "= auth_db core.stores.store_id, > 0"
+        text        store_code   UK "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+        text        store_name      "1..200 chars"
+        text        s3_folder    UK "relative, ends with /"
+        text        timezone
+        text        status          "ACTIVE | INACTIVE"
+        timestamptz synced_at
+        timestamptz copied_at       "default now()"
+    }
+
+    master_departments {
+        bigint      department_id PK "identity"
+        bigint      store_id      FK "UK (store_id, dept_number)"
+        text        store_code
+        integer     dept_number      "UK (store_id, dept_number)"
+        text        dept_name        "used by reports"
+        text        sales_class      "merchandise | lottery_sale | lottery_payout | fuel"
+        timestamptz created_at
+        timestamptz updated_at
+        text        pos_name         "V5: last name from POS files"
+        bigint      admin_set_by     "V5: set together with admin_set_at"
+        timestamptz admin_set_at     "V5"
+    }
+
+    master_department_changes {
+        bigint      change_id       PK "identity"
+        bigint      store_id        FK
+        integer     dept_number
+        text        action             "SET | RESET"
+        text        old_name
+        text        old_sales_class
+        text        new_name
+        text        new_sales_class
+        text        note
+        bigint      changed_by         "hor-auth account id"
+        timestamptz changed_at
+    }
+
+    %% =============== ingest ===============
+    ingest_s3_objects {
+        bigint      s3_object_id        PK "identity"
+        bigint      store_id            FK
+        text        file_type              "PJR | MCM | MSM | FGM | TLM | ISM | FPM | TPM"
+        date        business_date
+        integer     version_no             "> 0, _vN in key"
+        text        bucket              UK "UK (bucket, object_key, etag)"
+        text        object_key          UK "..._<TYPE>_<date>_v<n>.zip"
+        text        etag                UK
+        bigint      size_bytes             "> 0"
+        timestamptz last_modified          "S3 LastModified"
+        timestamptz manifest_created_at    "manifest.json createdAt"
+        text        mirror_version         "manifest.json fastMirrorVersion"
+        timestamptz downloaded_at
+    }
+
+    ingest_s3_object_files {
+        bigint      s3_object_id PK, FK
+        text        file_path    PK "no leading / or .. (zip-slip guard)"
+        bigint      size_bytes      ">= 0"
+        char64      sha256          "lowercase hex"
+        timestamptz modified_at
+    }
+
+    ingest_fetch_requests {
+        bigint      fetch_request_id PK "identity"
+        bigint      store_id         FK
+        date        business_date
+        text        file_type           "default PJR"
+        text        mode                "REFUSE | REPLACE"
+        text        status              "CLAIMED | RUNNING | LOADED | REFUSED | NOT_FOUND | FAILED"
+        text        message             "required when FAILED"
+        bigint      s3_object_id     FK "nullable"
+        bigint      requested_by        "hor-auth admin id"
+        timestamptz requested_at
+        timestamptz finished_at         "NULL while CLAIMED/RUNNING"
+    }
+
+    ingest_load_checks {
+        bigint      check_id         PK "identity"
+        bigint      fetch_request_id FK
+        text        check_name
+        numeric     expected            "numeric(14,4)"
+        numeric     actual              "numeric(14,4)"
+        boolean     passed
+        boolean     hard                "hard failure rolls back the load"
+        text        detail
+        timestamptz checked_at
+    }
+
+    %% =============== pjr ===============
+    pjr_pjr_file {
+        bigint      file_id        PK "bigserial"
+        bigint      store_id       FK "UK (store_id, file_name)"
+        text        store_code
+        bigint      s3_object_id   FK "nullable"
+        text        file_name      UK "PJR<yymmddhhmmss><counter>.xml"
+        char64      sha256
+        integer     size_bytes
+        timestamp   written_at        "from name, not the business day"
+        bigint      file_counter
+        text        store_location
+        text        vendor_version
+        date        business_date
+        timestamp   shift_begin
+        timestamptz loaded_at
+    }
+
+    pjr_event {
+        bigint      file_id               PK, FK
+        bigint      store_id              FK
+        text        store_code
+        date        business_date
+        text        event_type               "SaleEvent | RefundEvent | VoidEvent | OtherEvent | FinancialEvent"
+        text        detail_kind              "sale | refund | void | no_sale | register_open | register_close | safe_drop | payout | pay_in"
+        bigint      transaction_id           "not unique over time"
+        integer     register_id
+        text        register_group           "generated: pump (10001-10999) | inside"
+        text        cashier_id
+        text        till_id
+        timestamp   started_at               "store-local"
+        timestamp   ended_at
+        timestamp   receipt_at
+        boolean     is_outside
+        boolean     is_suspended             "prepay deposit, not a sale"
+        boolean     is_training
+        boolean     is_offline
+        boolean     counts_as_sale           "generated: Sale/Refund and not suspended"
+        integer     linked_register_id
+        bigint      linked_transaction_id
+        text        link_reason
+        text        loyalty_program
+        numeric     total_gross
+        numeric     total_net
+        numeric     total_tax
+        numeric     total_grand
+        text        grand_direction          "Collected | Refunded"
+        numeric     detail_amount            "drop / payout / pay-in / cash in drawer"
+        text        payee
+        text        alert_code
+        text        reason
+    }
+
+    pjr_event_line {
+        bigint      file_id           PK, FK
+        smallint    line_no           PK "shared numbering with tenders and taxes"
+        bigint      store_id          FK
+        text        store_code
+        date        business_date
+        text        status               "normal | cancel"
+        text        line_type            "ItemLine | MerchandiseCodeLine | FuelLine | FuelPrepayLine"
+        integer     dept_number
+        text        pos_code
+        text        pos_code_format
+        text        pos_code_modifier
+        text        description
+        text        entry_method
+        numeric     quantity             "numeric(12,3); gallons on fuel"
+        numeric     selling_units        "numeric(12,3)"
+        numeric     actual_price         "numeric(12,3)"
+        numeric     regular_price        "numeric(12,3)"
+        numeric     sales_amount         "after promotions"
+        numeric     promotion_amount     "negative"
+        numeric     discount_amount      "negative"
+        text        promotion_reasons
+        numeric     gross_amount         "generated: sales - promotion - discount"
+        numeric     void_value           "generated: regular_price x qty on cancel"
+        text        tax_level
+        text        fuel_grade_id
+        smallint    fuel_position
+        text        price_tier
+        text        service_level
+    }
+
+    pjr_tender_line {
+        bigint      file_id           PK, FK
+        smallint    line_no           PK
+        text        status
+        text        tender_code          "cash | creditCards | debitCards | outsideCredit | outsideDebit | generic"
+        text        tender_sub
+        numeric     amount               "change is negative"
+        boolean     is_change
+        text        provider
+        numeric     authorized_amount
+    }
+
+    pjr_event_tax {
+        bigint      file_id            PK, FK
+        smallint    line_no            PK
+        text        status
+        text        tax_level             "TaxLevelID"
+        numeric     taxable_amount
+        numeric     tax_collected
+        numeric     taxable_refunded
+        numeric     tax_refunded
+        numeric     tax_exempt
+        numeric     tax_forgiven_sales
+    }
+
+    pjr_load_failure {
+        bigint      failure_id       PK "bigserial"
+        bigint      store_id         FK "nullable"
+        text        store_code
+        bigint      fetch_request_id FK "nullable"
+        text        file_name
+        char64      sha256
+        text        error
+        timestamptz failed_at
+    }
+
+    %% =============== mcm (V6) ===============
+    mcm_department_day {
+        bigint      store_id                    PK, FK
+        date        business_date               PK "MovementHeader BusinessDate"
+        integer     dept_number                 PK "MerchandiseCode"
+        text        store_code
+        text        dept_name                      "MerchandiseCodeDescription as written"
+        numeric     sales_amount                   "before promotions, refunds included; = PJR gross + refund"
+        numeric     sales_quantity                 "numeric(12,3); fuel: lines, not gallons"
+        numeric     promotion_amount               "negative"
+        integer     promotion_count
+        numeric     discount_amount                "negative (fuel discount)"
+        integer     discount_count
+        numeric     refund_amount                  "negative; = -PJR refund"
+        integer     refund_count
+        integer     transaction_count
+        numeric     open_dept_sales_amount
+        integer     open_dept_transaction_count
+        bigint      s3_object_id                FK "CASCADE"
+        text        file_name                      "the PrimaryReportPeriod 2 file"
+        char64      sha256
+        timestamp   period_begin                   "store-local"
+        timestamp   period_end
+        timestamptz loaded_at
+    }

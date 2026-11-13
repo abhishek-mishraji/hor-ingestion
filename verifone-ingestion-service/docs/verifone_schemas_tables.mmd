@@ -1,0 +1,171 @@
+flowchart TB
+
+    subgraph DB["DATABASE: verifone_db"]
+        direction TB
+
+        %% ========================================================
+        %% INGEST SCHEMA
+        %% ========================================================
+        subgraph INGEST["SCHEMA: ingest (S3 Downloads & Audit)"]
+            direction TB
+            ING_FETCH["<b>ingest.fetch_requests</b><br/>Tracks fetch lifecycle, duration & actor"]
+            ING_OBJ["<b>ingest.s3_objects</b><br/>S3 zip metadata, version & ETag"]
+            ING_FILES["<b>ingest.s3_object_files</b><br/>Files in zip with verified SHA-256"]
+        end
+
+        %% ========================================================
+        %% MASTER SCHEMA
+        %% ========================================================
+        subgraph MASTER["SCHEMA: master (Stores & Reference Codes)"]
+            direction TB
+            MST_STORES["<b>master.stores</b><br/>★ Local Store Replica (from auth_db) ★"]
+            
+            subgraph MST_CODES["Master Reference Entities & Versions"]
+                direction TB
+                MST_DEP["<b>master.departments</b> & versions"]
+                MST_ITM["<b>master.items</b> & versions (UPCs)"]
+                MST_CAT["<b>master.categories</b> & versions"]
+                MST_CSH["<b>master.cashiers</b> & versions"]
+                MST_REG["<b>master.registers</b> (POS Terminals)"]
+                MST_TAX["<b>master.taxes</b> & versions"]
+                MST_PAY["<b>master.payment_types</b> & versions"]
+                MST_CRD["<b>master.card_types</b> & <b>master.cards</b> (Masked)"]
+                MST_LOY["<b>master.loyalty_programs</b> & accounts"]
+                MST_FUL["<b>master.fuel_grades</b> & versions"]
+                MST_PRC["<b>master.fuel_price_levels</b> & versions"]
+                MST_MOD["<b>master.fuel_service_modes</b> & versions"]
+                MST_TIR["<b>master.fuel_tiers</b>"]
+                MST_PRM["<b>master.promotions</b> & versions"]
+                MST_HSE["<b>master.house_accounts</b> & versions"]
+            end
+        end
+
+        %% ========================================================
+        %% CPJ SCHEMA
+        %% ========================================================
+        subgraph CPJ["SCHEMA: cpj (Closed Period Journal Transactions)"]
+            direction TB
+            
+            subgraph CPJ_ROOT["Day Header & Audit Reconciliations"]
+                CPJ_FILES["<b>cpj.cpj_files</b><br/>★ Root Closed Business Day Header ★"]
+                CPJ_TOTALS["<b>cpj.file_totals</b><br/>Opening & closing cumulative meters"]
+                CPJ_CHECKS["<b>cpj.load_checks</b><br/>9 financial balance & audit checks"]
+                CPJ_SESSIONS["<b>cpj.cashier_sessions</b><br/>Drawer sessions & till counts"]
+                CPJ_PERIODS["<b>cpj.period_closes</b><br/>Shift & day close events"]
+            end
+
+            subgraph CPJ_TX["Transactions & Line Items"]
+                CPJ_TICKETS["<b>cpj.tickets</b><br/>★ Customer Transaction Receipts ★"]
+                CPJ_T_CASH["<b>cpj.ticket_cashiers</b>"]
+                CPJ_T_AGE["<b>cpj.ticket_age_checks</b> (Birth date)"]
+                CPJ_T_FS["<b>cpj.ticket_food_stamps</b> (EBT)"]
+                CPJ_T_TAX["<b>cpj.ticket_taxes</b>"]
+                CPJ_T_CPN["<b>cpj.ticket_coupons</b>"]
+                CPJ_T_NET["<b>cpj.ticket_network_products</b>"]
+                CPJ_T_LOY["<b>cpj.ticket_loyalty</b>"]
+                
+                CPJ_LINES["<b>cpj.ticket_lines</b><br/>Merchandise lines, fuel & voids"]
+                CPJ_L_FLAGS["<b>cpj.line_flags</b> & flag_types"]
+                CPJ_L_FUEL["<b>cpj.line_fuel</b> (Pump #, gallons, base price)"]
+                CPJ_L_FDISC["<b>cpj.line_fuel_discounts</b>"]
+                CPJ_L_LDISC["<b>cpj.line_loyalty_discounts</b>"]
+                CPJ_L_PROMO["<b>cpj.line_promotions</b>"]
+                CPJ_L_TAX["<b>cpj.line_taxes</b>"]
+            end
+
+            subgraph CPJ_PAY_EVT["Payments & Cashier Events"]
+                CPJ_PAY["<b>cpj.payment_lines</b> (Cash, debit, credit)"]
+                CPJ_CARD["<b>cpj.payment_card_details</b> (Auth codes, batch #)"]
+                
+                CPJ_EVT["<b>cpj.cashier_events</b> (Safe drops, payouts)"]
+                CPJ_EVT_DRW["<b>cpj.cashier_event_drawer_totals</b>"]
+                CPJ_EVT_PRC["<b>cpj.cashier_event_price_checks</b>"]
+                
+                CPJ_F_PRC["<b>cpj.fuel_price_changes</b> & lines"]
+            end
+        end
+
+        %% ========================================================
+        %% REPORT SCHEMA
+        %% ========================================================
+        subgraph REPORT["SCHEMA: report (16 Analytical Reporting Views)"]
+            direction TB
+            REP_SALES["<b>report.sale_tickets</b> / <b>sale_lines</b> / <b>ticket_list</b>"]
+            REP_DAILY["<b>report.daily_summary</b> / <b>report.loaded_days</b>"]
+            REP_DEP["<b>report.department_daily</b> / <b>department_monthly</b>"]
+            REP_FUEL["<b>report.fuel_daily</b> / <b>report.fuel_monthly</b>"]
+            REP_ITEMS["<b>report.items_daily</b>"]
+            REP_LOT["<b>report.lottery_daily</b> / <b>report.lottery_monthly</b>"]
+            REP_CASH["<b>report.payments_daily</b> / <b>cash_movements</b> / <b>suspicious_events</b>"]
+        end
+
+        %% ========================================================
+        %% FUTURE SCHEMAS
+        %% ========================================================
+        subgraph FUTURE["FUTURE EXTENSIONS (Separate Schemas)"]
+            direction LR
+            subgraph MSM["SCHEMA: msm (Merchandise Movement)"]
+                MSM_F["<b>msm.msm_files</b>"]
+                MSM_DEP["<b>msm.department_sales</b>"]
+                MSM_ITM["<b>msm.item_sales</b>"]
+                MSM_HUR["<b>msm.hourly_sales</b>"]
+            end
+
+            subgraph FGM["SCHEMA: fgm (Fuel Grade Movement)"]
+                FGM_F["<b>fgm.fgm_files</b>"]
+                FGM_DIP["<b>fgm.tank_dips</b>"]
+                FGM_MTR["<b>fgm.fuel_meters</b>"]
+                FGM_DEL["<b>fgm.fuel_deliveries</b>"]
+            end
+        end
+
+    end
+
+    %% Linkages
+    MST_STORES ==> ING_FETCH
+    MST_STORES ==> ING_OBJ
+    MST_STORES ==> CPJ_FILES
+    ING_OBJ --> CPJ_FILES
+    ING_FETCH --> CPJ_FILES
+    
+    CPJ_FILES ==> CPJ_TOTALS
+    CPJ_FILES ==> CPJ_CHECKS
+    CPJ_FILES ==> CPJ_TICKETS
+    CPJ_FILES ==> CPJ_SESSIONS
+    CPJ_FILES ==> CPJ_EVT
+    
+    CPJ_TICKETS ==> CPJ_LINES
+    CPJ_TICKETS ==> CPJ_PAY
+    CPJ_PAY --> CPJ_CARD
+    CPJ_LINES --> CPJ_L_FUEL
+    
+    MST_CODES -.-> CPJ_LINES
+    MST_CODES -.-> CPJ_PAY
+    
+    CPJ_FILES -.-> REPORT
+    
+    MST_STORES -.-> MSM_F
+    MST_STORES -.-> FGM_F
+
+    %% ========================================================
+    %% HIGH-CONTRAST LIGHT BLUE STYLING (LARGE TEXT)
+    %% ========================================================
+    classDef default fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#031d2e,font-size:15px;
+    classDef hero fill:#bae6fd,stroke:#0369a1,stroke-width:3px,color:#082f49,font-size:17px;
+    classDef futureBox fill:#f8fafc,stroke:#94a3b8,stroke-dasharray: 4 4,color:#334155,font-size:14px;
+
+    class MST_STORES,CPJ_FILES,CPJ_TICKETS hero;
+    class MSM_F,MSM_DEP,MSM_ITM,MSM_HUR,FGM_F,FGM_DIP,FGM_MTR,FGM_DEL futureBox;
+
+    style DB fill:#f0f9ff,stroke:#0284c7,stroke-width:3px,color:#082f49;
+    style INGEST fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#082f49;
+    style MASTER fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#082f49;
+    style MST_CODES fill:#f0f9ff,stroke:#38bdf8,stroke-width:2px,color:#082f49;
+    style CPJ fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#082f49;
+    style CPJ_ROOT fill:#f0f9ff,stroke:#38bdf8,stroke-width:2px,color:#082f49;
+    style CPJ_TX fill:#f0f9ff,stroke:#38bdf8,stroke-width:2px,color:#082f49;
+    style CPJ_PAY_EVT fill:#f0f9ff,stroke:#38bdf8,stroke-width:2px,color:#082f49;
+    style REPORT fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#082f49;
+    style FUTURE fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,color:#334155;
+    style MSM fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#334155;
+    style FGM fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#334155;

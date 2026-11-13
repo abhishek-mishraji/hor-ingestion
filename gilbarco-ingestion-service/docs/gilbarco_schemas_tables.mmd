@@ -1,0 +1,133 @@
+flowchart TB
+
+    subgraph DB["DATABASE: gilbarco_db"]
+        direction TB
+
+        %% ========================================================
+        %% INGEST SCHEMA (V1)
+        %% ========================================================
+        subgraph INGEST["SCHEMA: ingest (S3 Downloads & Audit)"]
+            direction TB
+            ING_FETCH["<b>ingest.fetch_requests</b><br/>Fetch lifecycle: CLAIMED → RUNNING → LOADED / FAILED"]
+            ING_OBJ["<b>ingest.s3_objects</b><br/>S3 zip metadata, file type, version & ETag"]
+            ING_FILES["<b>ingest.s3_object_files</b><br/>Files in zip with verified SHA-256"]
+            ING_CHECKS["<b>ingest.load_checks</b><br/>Hard & soft checks per fetch (PJR + MCM)"]
+        end
+
+        %% ========================================================
+        %% MASTER SCHEMA (V1, V5)
+        %% ========================================================
+        subgraph MASTER["SCHEMA: master (Stores & Departments)"]
+            direction TB
+            MST_STORES["<b>master.stores</b><br/>★ Local Store Replica (from auth_db) ★"]
+
+            subgraph MST_CODES["Department Reference"]
+                direction TB
+                MST_DEP["<b>master.departments</b><br/>dept_name, sales_class, pos_name, admin override"]
+                MST_CHG["<b>master.department_changes</b><br/>Admin SET / RESET audit (V5)"]
+                MST_FN["<b>master.sales_class_for()</b><br/>merchandise | lottery_sale | lottery_payout"]
+            end
+        end
+
+        %% ========================================================
+        %% PJR SCHEMA (V2)
+        %% ========================================================
+        subgraph PJR["SCHEMA: pjr (Passport POS Journal)"]
+            direction TB
+
+            subgraph PJR_ROOT["File Header & Failures"]
+                PJR_FILE["<b>pjr.pjr_file</b><br/>★ One row per PJR XML file ★"]
+                PJR_FAIL["<b>pjr.load_failure</b><br/>Files that could not be parsed"]
+            end
+
+            subgraph PJR_TX["Events & Lines"]
+                PJR_EVENT["<b>pjr.event</b><br/>★ Sale, refund, void, no-sale, drop, payout, pay-in ★"]
+                PJR_LINE["<b>pjr.event_line</b><br/>Item, merchandise code, fuel & prepay lines; cancels"]
+                PJR_TENDER["<b>pjr.tender_line</b><br/>Cash, credit, debit, outside cards; change"]
+                PJR_TAX["<b>pjr.event_tax</b><br/>Tax collected, refunded, exempt per level"]
+            end
+        end
+
+        %% ========================================================
+        %% MCM SCHEMA (V6)
+        %% ========================================================
+        subgraph MCM["SCHEMA: mcm (Merchandise Code Movement)"]
+            direction TB
+            MCM_DAY["<b>mcm.department_day</b><br/>Store-level (period 2) department totals per day"]
+        end
+
+        %% ========================================================
+        %% REPORT SCHEMA (V3, V4, V6)
+        %% ========================================================
+        subgraph REPORT["SCHEMA: report (16 Analytical Reporting Views)"]
+            direction TB
+            REP_LINES["<b>report.v_sold_line</b> / <b>v_void_line</b>"]
+            REP_DAILY["<b>report.rpt_day_summary</b>"]
+            REP_DEP["<b>report.rpt_department_daily</b> / <b>rpt_items_sold_daily</b>"]
+            REP_FUEL["<b>report.rpt_fuel_daily</b>"]
+            REP_LOT["<b>report.rpt_lottery_daily</b> / <b>rpt_lottery_payout_daily</b>"]
+            REP_CASH["<b>report.rpt_payment_daily</b> / <b>rpt_cash_movement</b> / <b>rpt_payment_gap</b>"]
+            REP_SUS["<b>report.rpt_suspicious_event</b> / <b>rpt_suspicious_daily</b> / <b>rpt_void_daily</b>"]
+            REP_MCM["<b>report.rpt_mcm_department_check</b> / <b>rpt_mcm_day_check</b><br/>match | mismatch | mcm_missing | pjr_missing"]
+        end
+
+        %% ========================================================
+        %% FUTURE FILE TYPES
+        %% ========================================================
+        subgraph FUTURE["FUTURE FILE TYPES (FileTypeProcessor plug-ins, schemas not designed yet)"]
+            direction LR
+            FUT_FGM["<b>FGM</b><br/>Fuel Grade Movement"]
+            FUT_MSM["<b>MSM</b><br/>Miscellaneous Summary Movement"]
+            FUT_OTHER["<b>TLM / ISM / FPM / TPM</b><br/>Accepted in ingest.s3_objects.file_type"]
+        end
+
+    end
+
+    %% Linkages (thick = foreign key, dotted = logical join or view)
+    MST_STORES ==> ING_FETCH
+    MST_STORES ==> ING_OBJ
+    MST_STORES ==> MST_DEP
+    MST_STORES ==> PJR_FILE
+    MST_STORES ==> MCM_DAY
+
+    ING_OBJ ==> ING_FILES
+    ING_OBJ --> ING_FETCH
+    ING_FETCH ==> ING_CHECKS
+    ING_OBJ ==> PJR_FILE
+    ING_OBJ ==> MCM_DAY
+    ING_FETCH --> PJR_FAIL
+
+    PJR_FILE ==> PJR_EVENT
+    PJR_EVENT ==> PJR_LINE
+    PJR_EVENT ==> PJR_TENDER
+    PJR_EVENT ==> PJR_TAX
+
+    MST_DEP -.-> MST_CHG
+    MST_CODES -.-> PJR_LINE
+    MCM_DAY -.->|names departments| MST_DEP
+
+    PJR_EVENT -.-> REPORT
+    MCM_DAY -.->|proves PJR day| REP_MCM
+
+    MST_STORES -.-> FUTURE
+
+    %% ========================================================
+    %% HIGH-CONTRAST LIGHT GREEN STYLING (LARGE TEXT)
+    %% ========================================================
+    classDef default fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#052e16,font-size:15px;
+    classDef hero fill:#bbf7d0,stroke:#15803d,stroke-width:3px,color:#14532d,font-size:17px;
+    classDef futureBox fill:#f8fafc,stroke:#94a3b8,stroke-dasharray: 4 4,color:#334155,font-size:14px;
+
+    class MST_STORES,PJR_FILE,PJR_EVENT hero;
+    class FUT_FGM,FUT_MSM,FUT_OTHER futureBox;
+
+    style DB fill:#f0fdf4,stroke:#16a34a,stroke-width:3px,color:#14532d;
+    style INGEST fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d;
+    style MASTER fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d;
+    style MST_CODES fill:#f0fdf4,stroke:#4ade80,stroke-width:2px,color:#14532d;
+    style PJR fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d;
+    style PJR_ROOT fill:#f0fdf4,stroke:#4ade80,stroke-width:2px,color:#14532d;
+    style PJR_TX fill:#f0fdf4,stroke:#4ade80,stroke-width:2px,color:#14532d;
+    style MCM fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d;
+    style REPORT fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d;
+    style FUTURE fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,color:#334155;
