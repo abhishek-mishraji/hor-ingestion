@@ -1,0 +1,27 @@
+# Install: sudo cp infra/systemd/verifone-ingestion.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now verifone-ingestion
+# Runs the jar straight from the clone; settings come from .env in WorkingDirectory.
+# Needs auth-service running (JWKS at 127.0.0.1:8091) for authenticated calls.
+[Unit]
+Description=HOR Verifone Ingestion Service
+After=network-online.target postgresql.service auth-service.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/hor/store-automation/hor-ingestion/verifone-ingestion-service
+ExecStart=/usr/bin/java -Xmx512m -jar /opt/hor/store-automation/hor-ingestion/verifone-ingestion-service/build/libs/verifone-ingestion-service.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target
