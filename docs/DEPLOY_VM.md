@@ -11,7 +11,7 @@ Browser ──https──▶ nginx  ingestion.handsoffretail.com
                     ├── /admin/      → ingestion-console build (static files)
                     ├── /api/auth/   → auth-service               127.0.0.1:8091  (already running)
                     ├── /api/ingestion/gilbarco/ → gilbarco-ingestion  127.0.0.1:8093
-                    └── /api/ingestion/          → verifone-ingestion  127.0.0.1:8092
+                    └── /api/ingestion/verifone/  → verifone-ingestion  127.0.0.1:8092
 
 verifone-ingestion ──▶ verifone_db (owns, Flyway) + auth_db (read-only, store sync) + S3 hor-stores-data
 gilbarco-ingestion ──▶ gilbarco_db (owns, Flyway) + auth_db (read-only, store sync) + S3 hor-stores-data
