@@ -19,11 +19,16 @@ final class AgeCheckHandler implements ElementHandler<ValueDraft> {
 
     @Override
     public void handle(XmlElement e, ValueDraft d) {
+        d.ageCheck = read(e);
+    }
+
+    /** One custDOB element (also the copy in trHeader/customer, see {@link CustomerHandler}). */
+    static ValueDraft.RawAgeCheck read(XmlElement e) {
         String dob = e.requiredAttr("dob");
         if (!e.text().map(dob::equals).orElse(true)) {
             throw new CpjFormatException("custDOB text differs from its @dob at " + e.path());
         }
-        d.ageCheck = new ValueDraft.RawAgeCheck(dob, Values.requiredIntAttr(e, "custAge"),
+        return new ValueDraft.RawAgeCheck(dob, Values.requiredIntAttr(e, "custAge"),
                 Values.requiredIntAttr(e, "minAge"), e.requiredAttr("dobEntryMeth"), e.path());
     }
 }

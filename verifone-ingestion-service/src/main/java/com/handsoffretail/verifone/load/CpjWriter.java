@@ -170,7 +170,8 @@ final class CpjWriter implements CpjSink {
         long paymentId = ids.next("cpj.payment_lines", "payment_line_id");
         batches.add(CpjTables.PAYMENT_LINES, paymentId, ticketId, p.lineNo(), p.type(),
                 codes.paymentTypeVersion(p.paymentType()), p.amount(), v(p.currency()), v(p.posSysid()), p.duplicate(),
-                p.pending(), v(p.originalPreauth()), v(p.couponEntryMethod()));
+                p.pending(), v(p.originalPreauth()), v(p.couponEntryMethod()),
+                v(p.houseAccount().map(codes::houseAccountVersion)));
         p.card().ifPresent(c -> batches.add(CpjTables.PAYMENT_CARD_DETAILS, paymentId, codes.card(c.maskedNumber()),
                 codes.cardType(c.cardName()), v(c.cardNameSysid()), c.entryMethod(), v(c.authCode()), v(c.authAt()),
                 v(c.authSource()), v(c.batchNo()), v(c.acquirerBatchNo()), v(c.hostId()), v(c.referenceNo()),

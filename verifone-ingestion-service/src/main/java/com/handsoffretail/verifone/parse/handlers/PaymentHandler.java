@@ -10,7 +10,7 @@ import com.handsoffretail.verifone.parse.XmlElement;
 import com.handsoffretail.verifone.parse.model.Codes;
 import com.handsoffretail.verifone.parse.model.Payment;
 
-/** trPaylines/trPayline with trpPaycode, trpAmt and the optional trpCardInfo. */
+/** trPaylines/trPayline with trpPaycode, trpAmt and the optional trpCardInfo and trpHouseAcct. */
 final class PaymentHandler implements ElementHandler<TicketDraft> {
 
     static final Set<String> PAYLINE_TYPES = Set.of("sale", "cancel");
@@ -46,7 +46,8 @@ final class PaymentHandler implements ElementHandler<TicketDraft> {
                 p.attr("locale"), Values.optionalIntAttr(p, "sysid"), Values.boolAttr(p, "duplicate"),
                 Values.boolAttr(p, "pending"),
                 p.attr("originalPreauth").map(v -> Values.decimal(v, Values.MONEY_SCALE, p.path() + "/@originalPreauth")),
-                p.child("trpCardInfo").map(PaymentHandler::card), p.childText("trpCouponEntryMethod"));
+                p.child("trpCardInfo").map(PaymentHandler::card), p.childText("trpCouponEntryMethod"),
+                p.child("trpHouseAcct").map(h -> new Codes.HouseAccount(h.requiredText(), h.requiredAttr("name"))));
     }
 
     private static Payment.Card card(XmlElement c) {

@@ -30,7 +30,7 @@ final class CashierHandler implements ElementHandler<HeaderDraft> {
     /** Reads one cashier element (also used for the cashier blocks of open/close cashier records). */
     static Ticket.Cashier cashier(XmlElement e, String role) {
         Codes.Cashier code = new Codes.Cashier(Values.requiredIntAttr(e, "sysid"), e.text().orElse(""),
-                Values.optionalIntAttr(e, "empNum"));
+                e.attr("empNum").map(String::strip).filter(v -> !v.isEmpty()));
         return new Ticket.Cashier(role, code, Values.requiredIntAttr(e, "posNum"), Values.requiredIntAttr(e, "period"),
                 Values.requiredIntAttr(e, "drawer"));
     }

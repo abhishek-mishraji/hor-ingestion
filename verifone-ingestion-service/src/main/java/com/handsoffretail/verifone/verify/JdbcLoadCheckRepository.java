@@ -101,6 +101,9 @@ class JdbcLoadCheckRepository implements LoadCheckRepository {
                                           JOIN master.cashiers c ON c.cashier_id = v.cashier_id WHERE c.store_id <> :s)
                 + (SELECT count(*) FROM t JOIN master.house_account_versions v ON v.house_account_version_id = t.house_account_version_id
                                           JOIN master.house_accounts h ON h.house_account_id = v.house_account_id WHERE h.store_id <> :s)
+                + (SELECT count(*) FROM cpj.payment_lines pl JOIN t ON t.ticket_id = pl.ticket_id
+                                          JOIN master.house_account_versions v ON v.house_account_version_id = pl.house_account_version_id
+                                          JOIN master.house_accounts h ON h.house_account_id = v.house_account_id WHERE h.store_id <> :s)
                 + (SELECT count(*) FROM cpj.ticket_cashiers tc JOIN t ON t.ticket_id = tc.ticket_id
                                           JOIN master.cashier_versions v ON v.cashier_version_id = tc.cashier_version_id
                                           JOIN master.cashiers c ON c.cashier_id = v.cashier_id WHERE c.store_id <> :s)

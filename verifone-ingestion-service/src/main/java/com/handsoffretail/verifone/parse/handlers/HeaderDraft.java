@@ -40,6 +40,8 @@ public final class HeaderDraft {
     Integer periodSeq;
     Integer periodType;
     Boolean mwsEnabled;
+    /** trHeader/customer/custDOB: only compared with trValue/custDOB, never stored. */
+    ValueDraft.RawAgeCheck customerAgeCheck;
 
     public Optional<OffsetDateTime> at() {
         return Optional.ofNullable(at);

@@ -36,8 +36,8 @@ public final class Codes {
         }
     }
 
-    /** cashier / originalCashier: @sysid, text = name, @empNum. */
-    public record Cashier(int sysid, String name, Optional<Integer> employeeNumber) {
+    /** cashier / originalCashier: @sysid, text = name, @empNum (a number, or a login name on some registers; as written). */
+    public record Cashier(int sysid, String name, Optional<String> employeeNumber) {
         public Cashier {
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(employeeNumber, "employeeNumber");

@@ -12,7 +12,8 @@ class UnmappedInputCheck implements LoadCheck {
 
     @Override
     public List<CheckResult> run(CheckContext c) {
-        String skipped = c.facts().skippedJournal().isEmpty() ? "" : "; journal text not stored by design: " + c.facts().skippedJournal();
+        String skipped = (c.facts().skippedJournal().isEmpty() ? "" : "; journal text not stored by design: " + c.facts().skippedJournal())
+                + (c.facts().skippedTrans().isEmpty() ? "" : "; trans not stored by design: " + c.facts().skippedTrans());
         return List.of(CheckResult.counted("no_unmapped_input", 0, 0, true,
                 c.facts().transCount() + " trans read" + skipped));
     }

@@ -56,7 +56,7 @@ final class CpjTables {
     static final Table PAYMENT_LINES = table("cpj.payment_lines", true, "payment_line_id", BIGINT, "ticket_id", BIGINT,
             "line_no", SMALLINT, "payline_type", VARCHAR, "payment_type_version_id", BIGINT, "amount", NUMERIC,
             "currency", VARCHAR, "pos_sysid", INTEGER, "is_duplicate", BOOLEAN, "is_pending", BOOLEAN,
-            "original_preauth_amount", NUMERIC, "coupon_entry_method", VARCHAR);
+            "original_preauth_amount", NUMERIC, "coupon_entry_method", VARCHAR, "house_account_version_id", BIGINT);
     static final Table PAYMENT_CARD_DETAILS = table("cpj.payment_card_details", false, "payment_line_id", BIGINT,
             "card_id", BIGINT, "card_type_id", BIGINT, "card_name_sysid", INTEGER, "entry_method", VARCHAR,
             "auth_code", VARCHAR, "auth_at", TIMESTAMP_WITH_TIMEZONE, "auth_source", VARCHAR, "batch_no", VARCHAR,

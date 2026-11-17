@@ -10,8 +10,9 @@ import com.handsoffretail.verifone.TestEnv;
 
 /**
  * The same contract against the real bucket, read only, with the owner's key from the secrets file.
- * Skipped (with a message) when the key is absent. Tiki Hut: 2026-10-11 has v1; 2025-09-01 has
- * nothing (the history starts 2025-09-25).
+ * Skipped (with a message) when the key is absent. Tiki Hut: 2025-09-26 has v1; 2025-09-01 has
+ * nothing and never will (the history starts 2025-09-25). Both are in one past month on purpose: a
+ * missing recent day can be uploaded later (2026-10-31 was, on 2026-11-17).
  */
 class S3ZipSourceContractTest extends ZipSourceContract {
 
@@ -45,7 +46,7 @@ class S3ZipSourceContractTest extends ZipSourceContract {
 
     @Override
     protected LocalDate dayWithZip() {
-        return LocalDate.parse("2026-10-11");
+        return LocalDate.parse("2025-09-26");
     }
 
     @Override
@@ -55,6 +56,6 @@ class S3ZipSourceContractTest extends ZipSourceContract {
 
     @Override
     protected LocalDate dayWithoutZip() {
-        return LocalDate.parse("2026-10-31");
+        return LocalDate.parse("2025-09-01");
     }
 }

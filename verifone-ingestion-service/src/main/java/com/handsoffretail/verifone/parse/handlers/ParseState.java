@@ -23,6 +23,7 @@ final class ParseState {
     final List<PeriodClose> periodCloses = new ArrayList<>();
     private final Map<String, Integer> ticketsByType = new TreeMap<>();
     private final Map<String, Integer> skippedJournal = new TreeMap<>();
+    private final Map<String, Integer> skippedTrans = new TreeMap<>();
     private final List<String> storeNumberMismatches = new ArrayList<>();
     private final Map<Integer, Integer> physicalRegisterIds = new HashMap<>();
     private final List<String> registerConflicts = new ArrayList<>();
@@ -55,6 +56,11 @@ final class ParseState {
         skippedJournal.merge(textType, 1, Integer::sum);
     }
 
+    /** A whole trans of a type not stored by design (printCashier), after its shape was checked. */
+    void transSkipped(String type) {
+        skippedTrans.merge(type, 1, Integer::sum);
+    }
+
     /** Every trHeader/storeNumber must equal transSet/@site (a hard load check). */
     void storeNumber(String storeNumber, String where) {
         storeNumbersChecked++;
@@ -83,7 +89,7 @@ final class ParseState {
     }
 
     ParseFacts facts() {
-        return new ParseFacts(transCount, ticketsByType, cashierEvents, skippedJournal, storeNumbersChecked,
+        return new ParseFacts(transCount, ticketsByType, cashierEvents, skippedJournal, skippedTrans, storeNumbersChecked,
                 storeNumberMismatchCount, storeNumberMismatches,
                 sessions.rootCopies(), sessions.rootCopiesEqual(), sessions.problems(), couponTotalInFile, couponSum,
                 ticketsWithCouponMismatch, physicalRegisterIds, registerConflicts);

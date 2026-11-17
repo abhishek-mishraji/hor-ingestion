@@ -42,6 +42,7 @@ final class TicketParser implements TransParser {
         int posNum = register(h, where);
         h.storeNumber().ifPresent(n -> state.storeNumber(n, where));
         h.physicalRegisterId().ifPresent(id -> state.physicalRegister(posNum, id, where));
+        customerCopy(h, d.value, where);
         if (d.couponTotal != null || !d.coupons.isEmpty()) {
             state.coupons(Optional.ofNullable(d.couponTotal).orElse(BigDecimal.ZERO),
                     d.coupons.stream().map(Ticket.Coupon::discount).reduce(BigDecimal.ZERO, BigDecimal::add));
@@ -63,6 +64,19 @@ final class TicketParser implements TransParser {
         }
         return h.ticketPosNum().or(h::headerPosNum)
                 .orElseThrow(() -> new CpjFormatException("no register (posNum) in " + where));
+    }
+
+    /** trHeader/customer/custDOB must repeat trValue/custDOB exactly (it is not stored itself). */
+    private static void customerCopy(HeaderDraft h, ValueDraft v, String where) {
+        ValueDraft.RawAgeCheck copy = h.customerAgeCheck;
+        if (copy == null) {
+            return;
+        }
+        ValueDraft.RawAgeCheck age = v == null ? null : v.ageCheck;
+        if (age == null || !copy.dob().equals(age.dob()) || copy.customerAge() != age.customerAge()
+                || copy.minAge() != age.minAge() || !copy.entryMethod().equals(age.entryMethod())) {
+            throw new CpjFormatException("trHeader/customer/custDOB differs from trValue/custDOB in " + where);
+        }
     }
 
     private static Ticket.Value value(ValueDraft v, Ticket.Header header) {

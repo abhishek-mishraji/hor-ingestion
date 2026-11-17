@@ -2,9 +2,12 @@ package com.handsoffretail.verifone.parse.handlers;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
@@ -30,6 +33,7 @@ import com.handsoffretail.verifone.parse.model.ParseFacts;
 public final class CpjParser {
 
     private static final String ROOT = "transSet";
+    private static final Pattern LOCAL_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
     private static final XMLInputFactory FACTORY = XmlElements.secureFactory();
 
     private final Map<String, TransParser> byType;
@@ -49,6 +53,7 @@ public final class CpjParser {
         byType.put("openCashier", cashier);
         byType.put("closeCashier", cashier);
         byType.put("periodClose", new PeriodCloseParser());
+        byType.put(PrintCashierParser.TYPE, new PrintCashierParser());
         return new CpjParser(byType);
     }
 
@@ -101,6 +106,7 @@ public final class CpjParser {
                 state.sessions.rootCopy(e);
                 e.verifyFullyUsed();
             }
+            case "printCashier" -> PrintCashierParser.skipRootCopy(e);
             case "trans" -> trans(e, root, state);
             default -> throw new UnmappedInputException("element " + e.path());
         }
@@ -136,7 +142,7 @@ public final class CpjParser {
         final String site;
         final int periodId;
         final String periodName;
-        final OffsetDateTime longId;
+        final String longIdText;
         final int shortId;
         OffsetDateTime openedAt;
         OffsetDateTime closedAt;
@@ -149,7 +155,7 @@ public final class CpjParser {
             site = required(a, "site");
             periodId = Values.integer(required(a, "periodID"), path + "/@periodID");
             periodName = required(a, "periodname");
-            longId = Values.moment(required(a, "longId"), path + "/@longId");
+            longIdText = required(a, "longId");
             shortId = Values.integer(required(a, "shortId"), path + "/@shortId");
             if (!a.isEmpty()) {
                 throw new UnmappedInputException("attribute " + path + "/@" + a.keySet().iterator().next());
@@ -172,8 +178,31 @@ public final class CpjParser {
             if (openedAt == null || closedAt == null || startTotals == null) {
                 throw new CpjFormatException("openedTime, closedTime and startTotals must come before the first trans in " + path);
             }
+            OffsetDateTime longId = longId();
             begun = true;
             state.sink.begin(new CpjFileHeader(periodId, periodName, longId, site, shortId, openedAt, closedAt, startTotals));
+        }
+
+        /**
+         * Most registers write @longId as the period's closing moment (equal to closedTime). Some write
+         * only the date ("2026-11-06"); that date must be closedTime's local date, and closedTime is used.
+         */
+        private OffsetDateTime longId() {
+            String text = longIdText.strip();
+            if (!LOCAL_DATE.matcher(text).matches()) {
+                return Values.moment(text, path + "/@longId");
+            }
+            LocalDate date;
+            try {
+                date = LocalDate.parse(text);
+            } catch (DateTimeParseException e) {
+                throw new CpjFormatException("not a date or date-time with offset in " + path + "/@longId", e);
+            }
+            if (!date.equals(closedAt.toLocalDate())) {
+                throw new CpjFormatException("date " + date + " in " + path + "/@longId is not the closedTime date "
+                        + closedAt.toLocalDate());
+            }
+            return closedAt;
         }
     }
 }

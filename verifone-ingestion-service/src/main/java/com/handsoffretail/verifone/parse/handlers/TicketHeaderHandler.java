@@ -10,7 +10,7 @@ final class TicketHeaderHandler implements ElementHandler<TicketDraft> {
 
     private final HandlerRegistry<HeaderDraft> header = new HandlerRegistry<>(List.of(new HeaderMomentHandler(),
             new HeaderTerminalHandler(), new CashierHandler(), new OriginalCashierHandler(), new TicketNumberHandler(),
-            new TicketMiscHandler(), new PriceChangeHeaderHandler()));
+            new TicketMiscHandler(), new PriceChangeHeaderHandler(), new CustomerHandler()));
 
     @Override
     public Set<String> elements() {

@@ -6,8 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -133,6 +135,89 @@ class CpjParserRulesTest {
         assertThatThrownBy(() -> DobDecoder.decode("011560", 30, ticketDay, "path/custDOB"))
                 .isInstanceOf(CpjFormatException.class).hasMessageContaining("age 30").hasMessageNotContaining("011560");
         assertThatThrownBy(() -> DobDecoder.decode("13", 30, ticketDay, "p")).isInstanceOf(CpjFormatException.class);
+    }
+
+    @Test
+    void aDateOnlyLongIdTakesTheClosedTimeWhenTheDatesAgree() {
+        String dateOnly = file(sale("", "")).replace("longId=\"2026-03-01T06:00:00-05:00\"", "longId=\"2026-03-02\"");
+        Sink sink = new Sink();
+        parse(dateOnly, sink);
+        assertThat(sink.header.periodLongId()).isEqualTo(OffsetDateTime.parse("2026-03-02T06:00:00-05:00"));
+
+        String otherDay = file(sale("", "")).replace("longId=\"2026-03-01T06:00:00-05:00\"", "longId=\"2026-03-05\"");
+        assertThatThrownBy(() -> parse(otherDay, new Sink()))
+                .isInstanceOf(CpjFormatException.class).hasMessageContaining("is not the closedTime date 2026-03-02");
+
+        String garbage = file(sale("", "")).replace("longId=\"2026-03-01T06:00:00-05:00\"", "longId=\"yesterday\"");
+        assertThatThrownBy(() -> parse(garbage, new Sink()))
+                .isInstanceOf(CpjFormatException.class).hasMessage("not a date-time with offset in transSet/@longId");
+    }
+
+    @Test
+    void anEmployeeNumberCanBeALoginName() {
+        Sink sink = new Sink();
+        parse(file(sale("", "").replace("empNum=\"1\"", "empNum=\"satnnam\"")), sink);
+        assertThat(sink.tickets.get(0).cashiers()).singleElement()
+                .satisfies(c -> assertThat(c.cashier().employeeNumber()).contains("satnnam"));
+
+        Sink blank = new Sink();
+        parse(file(sale("", "").replace("empNum=\"1\"", "empNum=\"\"")), blank);
+        assertThat(blank.tickets.get(0).cashiers().get(0).cashier().employeeNumber()).isEmpty();
+    }
+
+    @Test
+    void printCashierIsCheckedCountedAndNotStored() {
+        String body = "<cCloseTime>2026-03-01T19:09:26-05:00</cCloseTime><cashierPeriod>436</cashierPeriod>"
+                + "<cReportTime>2026-03-01T19:09:34-05:00</cReportTime><drawerAmounts /><reconciledByID>24</reconciledByID>"
+                + "<reconciledByName>ANN</reconciledByName>";
+        String cashier = "<cashier sysid=\"24\" empNum=\"ann\" posNum=\"101\" period=\"436\">ANN</cashier><posNum>101</posNum>";
+        String trans = "<trans type=\"printCashier\"><trHeader>" + cashier + "</trHeader>" + body + "</trans>";
+        String rootCopy = "<printCashier>" + cashier + body + "</printCashier>";
+        Sink sink = new Sink();
+        ParseFacts facts = parse(file(rootCopy + trans + sale("", "")), sink);
+
+        assertThat(facts.skippedTrans()).containsExactlyEntriesOf(Map.of("printCashier", 1));
+        assertThat(sink.tickets).hasSize(1);
+
+        String filled = trans.replace("<drawerAmounts />", "<drawerAmounts><amt>1.00</amt></drawerAmounts>");
+        assertThatThrownBy(() -> parse(file(filled), new Sink()))
+                .isInstanceOf(UnmappedInputException.class).hasMessageContaining("drawerAmounts");
+        String extra = trans.replace("<reconciledByID>", "<surprise>1</surprise><reconciledByID>");
+        assertThatThrownBy(() -> parse(file(extra), new Sink()))
+                .isInstanceOf(UnmappedInputException.class).hasMessage("unmapped element transSet/trans/surprise");
+    }
+
+    @Test
+    void theCustomerAgeCheckInTheHeaderMustRepeatTheOneInTheValue() {
+        String age = "<custDOB dobEntryMeth=\"Manual\" minAge=\"21\" custAge=\"45\" dob=\"021481\">021481</custDOB>";
+        String header = "<customer>" + age + "</customer></trHeader>";
+        String same = file(sale(age, "").replace("</trHeader>", header));
+        Sink sink = new Sink();
+        parse(same, sink);
+        assertThat(sink.tickets.get(0).value()).hasValueSatisfying(v -> assertThat(v.ageCheck()).isPresent());
+
+        String other = file(sale(age, "").replace("</trHeader>", header.replace("custAge=\"45\"", "custAge=\"46\"")));
+        assertThatThrownBy(() -> parse(other, new Sink()))
+                .isInstanceOf(CpjFormatException.class).hasMessageContaining("trHeader/customer/custDOB differs");
+        String alone = file(sale("", "").replace("</trHeader>", header));
+        assertThatThrownBy(() -> parse(alone, new Sink()))
+                .isInstanceOf(CpjFormatException.class).hasMessageContaining("trHeader/customer/custDOB differs");
+    }
+
+    @Test
+    void aHouseAccountTenderKeepsItsAccount() {
+        String payline = "<trPaylines><trPayline type=\"sale\" sysid=\"1\" locale=\"DOLLAR\">"
+                + "<trpPaycode mop=\"6\" cat=\"18\" nacstendercode=\"generic\" nacstendersubcode=\"generic\">IN-HOUSE</trpPaycode>"
+                + "<trpAmt>1.00</trpAmt><trpHouseAcct name=\"Robbi\">1</trpHouseAcct></trPayline></trPaylines>";
+        Sink sink = new Sink();
+        parse(file(sale("", payline)), sink);
+
+        assertThat(sink.tickets.get(0).payments()).singleElement().satisfies(p -> {
+            assertThat(p.houseAccount()).hasValueSatisfying(h -> {
+                assertThat(h.accountNumber()).isEqualTo("1");
+                assertThat(h.name()).isEqualTo("Robbi");
+            });
+        });
     }
 
     @Test
