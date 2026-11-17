@@ -89,7 +89,7 @@ final class ParseState {
     }
 
     ParseFacts facts() {
-        return new ParseFacts(transCount, ticketsByType, cashierEvents, skippedJournal, skippedTrans, storeNumbersChecked,
+        return new ParseFacts(transCount, ticketsByType, cashierEvents, skippedJournal, skippedTrans, sessions.identicalRepeats(), storeNumbersChecked,
                 storeNumberMismatchCount, storeNumberMismatches,
                 sessions.rootCopies(), sessions.rootCopiesEqual(), sessions.problems(), couponTotalInFile, couponSum,
                 ticketsWithCouponMismatch, physicalRegisterIds, registerConflicts);

@@ -15,6 +15,7 @@ public record ParseFacts(
         int cashierEvents,
         Map<String, Integer> skippedJournal,
         Map<String, Integer> skippedTrans,
+        Map<String, Integer> identicalRepeats,
         int storeNumbersChecked,
         int storeNumberMismatchCount,
         List<String> storeNumberMismatches,
@@ -31,6 +32,7 @@ public record ParseFacts(
         ticketsByType = Map.copyOf(ticketsByType);
         skippedJournal = Map.copyOf(skippedJournal);
         skippedTrans = Map.copyOf(skippedTrans);
+        identicalRepeats = Map.copyOf(identicalRepeats);
         storeNumberMismatches = List.copyOf(storeNumberMismatches);
         rootCopyProblems = List.copyOf(rootCopyProblems);
         physicalRegisterIds = Map.copyOf(physicalRegisterIds);

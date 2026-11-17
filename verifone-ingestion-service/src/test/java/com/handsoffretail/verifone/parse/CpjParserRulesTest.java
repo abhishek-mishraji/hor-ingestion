@@ -188,6 +188,23 @@ class CpjParserRulesTest {
     }
 
     @Test
+    void anIdenticalRepeatedCashierRecordIsCountedAndADifferentOneFails() {
+        String cashier = "<cashier sysid=\"24\" empNum=\"ann\" posNum=\"101\" period=\"454\" drawer=\"1\">ANN</cashier><posNum>101</posNum>";
+        String body = cashier + "<cOpenTime>2026-03-01T20:53:09-05:00</cOpenTime><cashierPeriod>454</cashierPeriod>"
+                + "<beginCash mop=\"1\" cat=\"0\">150.00</beginCash>";
+        String open = "<trans type=\"openCashier\"><trHeader>" + cashier + "</trHeader>" + body + "</trans>";
+        String root = "<openCashier>" + body + "</openCashier>";
+
+        ParseFacts facts = parse(file(root + open + root + open + sale("", "")), new Sink());
+        assertThat(facts.identicalRepeats()).containsExactlyEntriesOf(Map.of("openCashier", 1));
+        assertThat(facts.rootCopies()).isEqualTo(facts.rootCopiesEqual());
+
+        String other = open.replace(">150.00<", ">175.00<");
+        assertThatThrownBy(() -> parse(file(open + other), new Sink()))
+                .isInstanceOf(CpjFormatException.class).hasMessageContaining("two different openCashier records for register / period 101/454");
+    }
+
+    @Test
     void theCustomerAgeCheckInTheHeaderMustRepeatTheOneInTheValue() {
         String age = "<custDOB dobEntryMeth=\"Manual\" minAge=\"21\" custAge=\"45\" dob=\"021481\">021481</custDOB>";
         String header = "<customer>" + age + "</customer></trHeader>";

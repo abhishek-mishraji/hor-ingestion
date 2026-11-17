@@ -27,9 +27,24 @@ final class CashierSessions {
     private final Map<String, Draft> sessions = new LinkedHashMap<>();
     private final Map<String, Map<String, String>> transCopies = new LinkedHashMap<>();
     private final List<RootCopy> rootCopies = new ArrayList<>();
+    private final Map<String, Integer> identicalRepeats = new TreeMap<>();
 
-    /** A {@code <trans type="openCashier|closeCashier">}. */
+    /**
+     * A {@code <trans type="openCashier|closeCashier">}. Some registers (1409_UT-84790) write each one
+     * twice in a row: an identical repeat is counted and dropped, a different one fails the load.
+     */
     void transCopy(XmlElement trans, String kind) {
+        String repeatKey = kind + "/" + Values.intOf(trans.requiredChild("posNum")) + "/"
+                + Values.intOf(trans.requiredChild("cashierPeriod"));
+        Map<String, String> earlier = transCopies.get(repeatKey);
+        if (earlier != null) {
+            if (!earlier.equals(canonical(trans))) {
+                throw new CpjFormatException("two different " + kind + " records for register / period "
+                        + repeatKey.substring(kind.length() + 1) + " at " + trans.path());
+            }
+            identicalRepeats.merge(kind, 1, Integer::sum);
+            return;
+        }
         XmlElement header = trans.requiredChild(HEADER);
         Ticket.Cashier cashier = CashierHandler.cashier(trans.requiredChild("cashier"), CashierHandler.ROLE_CASHIER);
         int posNum = Values.intOf(trans.requiredChild("posNum"));
@@ -72,6 +87,11 @@ final class CashierSessions {
 
     List<CashierSession> sessions() {
         return sessions.values().stream().map(Draft::build).toList();
+    }
+
+    /** Identical repeated trans per type (openCashier / closeCashier), dropped after comparing. */
+    Map<String, Integer> identicalRepeats() {
+        return identicalRepeats;
     }
 
     int rootCopies() {

@@ -47,6 +47,7 @@ public class CountReconciler {
             String transType = null;
             String journalKind = null;
             long linesInTrans = 0;
+            int customerDepth = 0;
             while (r.hasNext()) {
                 int event = r.next();
                 if (event == XMLStreamConstants.START_ELEMENT) {
@@ -62,13 +63,22 @@ public class CountReconciler {
                             case "trjText" -> journalKind = r.getAttributeValue(null, "type");
                             case "trPayline" -> add(counts, PAYLINES);
                             case "trpCardInfo" -> add(counts, CARD_INFOS);
-                            case "custDOB" -> add(counts, AGE_CHECKS);
+                            // trHeader/customer/custDOB repeats the ticket's trValue/custDOB: one age check
+                            case "customer" -> customerDepth = depth;
+                            case "custDOB" -> {
+                                if (customerDepth == 0) {
+                                    add(counts, AGE_CHECKS);
+                                }
+                            }
                             default -> {
                                 // other elements are not counted
                             }
                         }
                     }
                 } else if (event == XMLStreamConstants.END_ELEMENT) {
+                    if (depth == customerDepth) {
+                        customerDepth = 0;
+                    }
                     if (depth == TRANS_DEPTH && transType != null) {
                         endTrans(counts, transType, journalKind, linesInTrans);
                         transType = null;
